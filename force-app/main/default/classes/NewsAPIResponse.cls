@@ -2,7 +2,7 @@
  * Wrapper class for parsing the NewsAPI response
  */
 public class NewsAPIResponse {
-    // TODO: Define fields to match the NewsAPI response structure
+    
     public String status { get; set; }
     public Integer totalResults { get; set; }
     public List<Article> articles { get; set; }
@@ -11,7 +11,7 @@ public class NewsAPIResponse {
      * Inner class representing a news artile
      */
     public class Article {
-        // TODO: Define article fields
+        
         public Source source {get; set;}
         public String author {get; set;}
         public String title {get; set;}
@@ -53,18 +53,24 @@ public class NewsAPIResponse {
      * Inner class representing a news source
      */
     public class Source {
-        // TODO: Define source fields
+        
         public String id {get; set;}
         public String name {get; set;}
 
     }
     
     /**
-     * Helper method to convert all articles in this response to Salesforce records
+     * Helper instance method to convert all articles in this response to Salesforce records
      * @return List<Article__c> List of Salesforce records
      */
     public List<Article__c> toSObjects() {
-        // TODO: Implement conversion of all articles to Salesforce records
-        return null;
+
+        List<Article__c> records = new List<Article__c>();
+        if(articles != null){
+            for(Article a : articles){
+                records.add(a.toSObject());
+            }
+        }
+        return records;
     }
 } 
