@@ -7,7 +7,7 @@ public with sharing class ProcessingResult {
     // Records collected throughout the run
     public List<Article__c> articlesToInsert = new List<Article__c>(); 
     // Messages collected throughout the run for the Custom Logging
-    public List<String> messageList = new List<String>{'NewsAPI Sync Log:'};
+    public List<String> messageList = new List<String>{'NewsAPI Sync Log, [Async Process]:'};
     // Flags to determine overall run status (Success, Partial Success, Error)
     public Boolean successRecorded = false;
     public Boolean errorRecorded = false;
