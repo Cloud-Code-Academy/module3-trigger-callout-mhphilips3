@@ -2,6 +2,11 @@ Malcolm's Comments
 ## Integration Logging (extra credit)
 To keep track of what's happening during each NewsAPI sync, I built a ProcessingResult wrapper that collects success and error messages, counts and collects processed records, and saves everything to a custom Integration_Log__c record. This helps keep things organized across async runs and gives a clear audit trail without digging through debug logs. It also handles edge cases like partial success, so I know if something kind of broke.  The collected records are then inserted in one go, rather than burning DML statements with each pass through the integration.
 
+## Future Path Notes
+  - `Last_Synced__c` is updated selectively -- only for News Category records that result in a successful response and article insert.
+  - Logging via the `ProcessingResult` class tracks per-category outcomes for clarity and post-run visibility.
+
+
 # Cloud Code Academy - Integration Developer Program
 ## Lesson 3: Outbound Callouts from Triggers
 
