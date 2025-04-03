@@ -11,6 +11,8 @@ public with sharing class ProcessingResult {
     // Flags to determine overall run status (Success, Partial Success, Error)
     public Boolean successRecorded = false;
     public Boolean errorRecorded = false;
+    
+    
 
     // Log Entry for the run
     public Integration_Log__c logEntry = new Integration_Log__c(
@@ -18,6 +20,12 @@ public with sharing class ProcessingResult {
         Run_Timestamp__c = Datetime.now(),
         Records_Processed__c = 0
     );
+
+    // Adds the Run_Group_Id__c to the LogEntry record
+    public void setRunGroupId(String runGroupId) {
+        logEntry.Run_Group_Id__c = runGroupId;
+    }
+    
 
     // Adds a success message to the log and marks the run as having at least one success
     public void addLogSuccess(String successMessage){
