@@ -7,7 +7,7 @@ public with sharing class ProcessingResult {
     // Records collected throughout the run
     public List<Article__c> articlesToInsert = new List<Article__c>(); 
     // Messages collected throughout the run for the Custom Logging
-    public List<String> messageList = new List<String>{'NewsAPI Sync Log, [Async Process]:'};
+    public List<String> messageList = new List<String>();
     // Flags to determine overall run status (Success, Partial Success, Error)
     public Boolean successRecorded = false;
     public Boolean errorRecorded = false;
@@ -24,6 +24,11 @@ public with sharing class ProcessingResult {
     // Adds the Run_Group_Id__c to the LogEntry record
     public void setRunGroupId(String runGroupId) {
         logEntry.Run_Group_Id__c = runGroupId;
+    }
+
+    // Sets the log record's Log Sequence number, used to consolidate logs after the run
+    public void setLogSequence(Integer sequence){
+        logEntry.Log_Sequence__c = sequence;
     }
     
 

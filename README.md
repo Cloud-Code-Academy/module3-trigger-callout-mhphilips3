@@ -6,6 +6,13 @@ To keep track of what's happening during each NewsAPI sync, I built a Processing
   - `Last_Synced__c` is updated selectively -- only for News Category records that result in a successful response and article insert.
   - Logging via the `ProcessingResult` class tracks per-category outcomes for clarity and post-run visibility.
 
+## Log Consolidation for Queueable Sync Jobs
+This got hairy quick and, while I think it's a pretty good solution, I spent a ton of time here, mostly just seeing what I could do to get this back into a manageable/useful log record.  At every stage, I tried to think best practices and resource efficiency, but I also was bound and determined to see if I could get this to work (which I did!), so I'll be very interested in critical feedback on this.  The issue, I realized, was that I couldn't maintain the state of a progressively building log over the course of what could be a bunch of individual, asyncronous transactions, but I wanted a record of what was happening at each "stage."  Here's my solution:
+ -  Each queueable job now creates its own ``Integration_Log__c`, tagged with a shared `Run_Group_Id__c` and a `Log_Sequence__c` value that tracks the order of execution.
+ - After the last category has been enqueued, a `LogRollupQueueable` job is scheduled with a short delay. This job queries for all logs tied to the group and checks if the expected number of logs have been created.
+    - If all logs aren't present yet, the job re-queues itself with an increased delay (up to a max of 10 minutes), continuing until the log count matches or the retry window closes.  Probably best practice to do this as a scheduled in the middle of the night, but I was impatient and, at some point wanted to see if I could do this, too.
+ - Once all expected logs are present, the log entries are combined into a single top-level record via the `LogRollupService`. The new record contains a cleaned-up message history and a consolidated count of all processed articles.
+ - The service will then delete all of the individual, per-page logs, so as to not clutter up the org.
 
 # Cloud Code Academy - Integration Developer Program
 ## Lesson 3: Outbound Callouts from Triggers

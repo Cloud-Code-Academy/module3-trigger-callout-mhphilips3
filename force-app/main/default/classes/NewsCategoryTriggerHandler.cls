@@ -113,14 +113,28 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param categoriesToSync List of News_Category__c records to sync
      */
     private static void syncCategoriesWithQueueable(List<News_Category__c> categoriesToSync) {
-        // TODO: Implement queueable job enqueuing
+        
         // Generate runGroupId to relate multiple log records
         String runGroupId = String.valueOf(Crypto.getRandomLong());
+        Integer sequence = 1;
 
         // - Create and enqueue NewsCategoryQueueable job for each category record (clone category first to avoid read only fail)
         for (News_Category__c cat : categoriesToSync){
             News_Category__c catClone = cat.clone(true, false, false, false);
-            System.enqueueJob(new NewsCategoryQueueable(catClone, runGroupId));
+            System.enqueueJob(new NewsCategoryQueueable(catClone, runGroupId, sequence));
+            sequence += cat.Pages__c != null ? Integer.valueOf(cat.Pages__c) : 1;
+        }
+
+        /**
+         * Kick off Log Consolidation Process (queueable) with the following parameters:
+         * runGroupId
+         * expectedCount = sequence -1
+         * delayMinutes = 2 
+         */
+        try{
+            System.enqueueJob(new LogRollupQueueable(runGroupId, sequence - 1, 2), 2);
+        } catch (Exception e){
+            System.debug ('error consolidating logs: ' + e.getMessage());
         }
     }
 

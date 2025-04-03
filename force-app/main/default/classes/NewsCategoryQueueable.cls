@@ -10,18 +10,21 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
     private Integer pages; // Number of pages to sync
     private Integer currentPage; // Current callout page
     private Integer pageSize; // Number of articles per page -- currently unused here, but placeholder for next step
+    private Integer sequence; // Order of Integration Log records related to the same run
     
     /**
      * Constructor for initial page (Page 1).
      * @param category Full News_Category__c record to process
      * @param runGroupId Shared identifier for grouping log records across the full run
+     * @param sequence Used to consolidate log records in proper order
      */
-    public NewsCategoryQueueable(News_Category__c category, String runGroupId) {
+    public NewsCategoryQueueable(News_Category__c category, String runGroupId, Integer sequence) {
         // TODO: Initialize first page
         this.category = category;
         this.pages = category.Pages__c != null ? Integer.valueOf(category.Pages__c) : 1;
         this.currentPage = 1;
         this.runGroupId = runGroupId;
+        this.sequence = sequence;
     }
     
     /**
@@ -29,13 +32,15 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param category Full News_Category__c record to process
      * @param currentPage Page number to process (starts at 2+)
      * @param runGroupId Shared identifier for grouping log records across the full run
+     * @param sequence Used to consolidate log records in proper order
      */
-    public NewsCategoryQueueable(News_Category__c category, Integer currentPage, String runGroupId) {
+    public NewsCategoryQueueable(News_Category__c category, Integer currentPage, String runGroupId, Integer sequence) {
         // Initialize with specific page
         this.category = category;
         this.currentPage = currentPage;
         this.runGroupId = runGroupId;
         this.pages = category.Pages__c != null ? Integer.valueOf(category.Pages__c) : 1;
+        this.sequence = sequence;
     }
     
     /**
@@ -46,7 +51,8 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
         // Initialize ProcessingResult wrapper for logging
         ProcessingResult result = new ProcessingResult();
         result.setRunGroupId(runGroupId);
-        result.messageList[0] = result.messageList[0].replace('[Async Process]', 'Queueable Path');
+        result.setLogSequence(sequence);
+        // result.messageList[0] = result.messageList[0].replace('[Async Process]', 'Queueable Path');
         result.messageList.add('Page ' + currentPage + ' of ' + pages + ' - Syncing category: ' + category.Name);
         
         // - Call NewsAPI for the current page
@@ -74,7 +80,7 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
 
         // - Update category if last page, chain to next page if more pages exist
         if (currentPage < pages){
-            System.enqueueJob(new NewsCategoryQueueable(category, currentPage +1, runGroupId));
+            System.enqueueJob(new NewsCategoryQueueable(category, currentPage + 1, runGroupId, sequence + 1));
             result.addLogSuccess('     - Queued next page (' + (currentPage +1) +')');
         } else {
             category.Last_Synced__c = System.now();
