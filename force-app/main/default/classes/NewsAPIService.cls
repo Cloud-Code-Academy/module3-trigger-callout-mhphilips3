@@ -63,7 +63,6 @@ public with sharing class NewsAPIService {
         try {
             return http.send(req);
         } catch(CalloutException e){
-            System.debug('Callout failed: ' + e.getMessage());
             throw new NewsAPIException('Callout failed: ' + e.getMessage());
         }
     }

@@ -19,7 +19,7 @@ public with sharing class NewsCategoryTriggerHandler {
                 categoryNameToIdMap.put(cat.Name, cat.Id);
             }
         }
-        System.debug('categoryNameToIdMap: ' + categoryNameToIdMap);
+        
         // - Call future method for callouts
         if(!categoryNames.isEmpty()){
             syncCategoriesWithFuture(categoryNameToIdMap);
@@ -61,13 +61,10 @@ public with sharing class NewsCategoryTriggerHandler {
         result.messageList.add('NewsAPI Sync Log, Future Path:');
 
         // - Make callouts to NewsAPI for each category
-        System.debug('received map: ' + categoryNameToIdMap);
         Integer count = 1;
         for (String categoryName : categoryNameToIdMap.keySet()){
             result.messageList.add(count + '. Syncing \'' + categoryName + '\' category:');
-            String catId = categoryNameToIdMap.get(categoryName);
-            System.debug('catId: ' + catId);
-
+            
             try{
                 NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, null, null);
                 
@@ -76,17 +73,14 @@ public with sharing class NewsCategoryTriggerHandler {
                     List<Article__c> articles = response.toSObjects(categoryNameToIdMap.get(categoryName), categoryName);
                     result.articlesToInsert.addAll(articles);
                     result.addLogSuccess('     - Retrieved ' + articles.size() + ' articles');
-                    result.incrementRecordsProcessed(articles.size());
-                    System.debug('received results from test: ' + articles);
+                    result.incrementRecordsProcessed(articles.size());                    
                 } else {
                     result.addLogError('     - No articles returned for category');
-                    categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly
-                    System.debug('no articles returned for category');
+                    categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                    
                 }                
             } catch (Exception e) {
                 result.addLogError('     - Error during callout: ' + e.getMessage());
-                categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly
-                System.debug('Error during callout: ' + e.getMessage());
+                categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                
             }
 
             count++;
@@ -97,10 +91,8 @@ public with sharing class NewsCategoryTriggerHandler {
             try{
                 insert result.articlesToInsert;
                 result.addLogSuccess('     - Inserted ' + result.articlesToInsert.size() + ' total articles.');
-                System.debug ('inserted artiles');
             } catch (Exception e) {
                 result.addLogError('     - Error on article insertion: ' + e.getMessage());
-                System.debug('article insertion failed: ' + e.getMessage());
             }
         }
 

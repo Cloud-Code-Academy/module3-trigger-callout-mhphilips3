@@ -60,7 +60,6 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
             NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(category.Name, pageSize, currentPage);
             if(response != null && !response.articles.isEmpty()){
                 // Convert response to Article__c records
-                System.debug(category.Id);
                 List<Article__c> articlesToInsert = response.toSObjects(category.Id, category.Name);
                 result.addLogSuccess('     - Retrieved ' + articlesToInsert.size() + ' articles');
 
