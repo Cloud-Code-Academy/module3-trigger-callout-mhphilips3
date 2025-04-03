@@ -9,7 +9,7 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param newRecords List of newly inserted News_Category__c records
      */
     public static void handleInsert(List<News_Category__c> newRecords) {
-        // TODO: Implement insert handler
+
         // - Filter categories that need to be synced
         List<String> categoryNames = new List<String>();
         Map<String, Id> categoryNameToIdMap = new Map<String, Id>();
@@ -19,7 +19,6 @@ public with sharing class NewsCategoryTriggerHandler {
                 categoryNameToIdMap.put(cat.Name, cat.Id);
             }
         }
-
 
         // - Call future method for callouts
         if(!categoryNames.isEmpty()){
@@ -34,9 +33,19 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param oldMap Map of old record states
      */
     public static void handleUpdate(List<News_Category__c> newRecords, Map<Id, News_Category__c> oldMap) {
-        // TODO: Implement update handler
+        
         // - Filter categories that need to be synced
+        List<News_Category__c> categoriesToSync = new List<News_Category__c>();
+        for(News_Category__c record : newRecords){
+            if(record.Sync__c && !oldMap.get(record.Id).Sync__c){
+                categoriesToSync.add(record);
+            }
+        }
+
         // - Call queueable method for callouts
+        if(!categoriesToSync.isEmpty()){
+            syncCategoriesWithQueueable(categoriesToSync);
+        }
     }
     
     /**
@@ -46,7 +55,7 @@ public with sharing class NewsCategoryTriggerHandler {
      */
     @future(callout=true)
     public static void syncCategoriesWithFuture(Map<String, Id> categoryNameToIdMap) {
-        // TODO: Implement future method
+        
         // Create ProcessingResult instance to track state during the integration run\
         ProcessingResult result = new ProcessingResult();
         result.messageList[0] = result.messageList[0].replace('[Async Process]', 'Future Path');
@@ -82,14 +91,15 @@ public with sharing class NewsCategoryTriggerHandler {
         if(!result.articlesToInsert.isEmpty()){
             try{
                 insert result.articlesToInsert;
-                result.addLogSuccess('Inserted ' + result.articlesToInsert.size() + ' total articles.');
+                result.addLogSuccess('     - Inserted ' + result.articlesToInsert.size() + ' total articles.');
             } catch (Exception e) {
-                result.addLogError('Error on article insertion: ' + e.getMessage());
+                result.addLogError('     - Error on article insertion: ' + e.getMessage());
             }
         }
 
         // Finalize and insert log entry
         result.finalizeLogEntry();
+        insert result.logEntry;
 
         // - Clean up by updating categories with current date
         if(!categoryNameToIdMap.isEmpty()){
@@ -104,11 +114,14 @@ public with sharing class NewsCategoryTriggerHandler {
      */
     private static void syncCategoriesWithQueueable(List<News_Category__c> categoriesToSync) {
         // TODO: Implement queueable job enqueuing
-        // Create ProcessingResult instance to track state during the integration run\
-        ProcessingResult result = new ProcessingResult();
-        result.messageList[0] = result.messageList[0].replace('[Async Process]', 'Queueable Path');
-        // - Determine pages to sync for each category
-        // - Create and enqueue NewsCategoryQueueable job for each category
+        // Generate runGroupId to relate multiple log records
+        String runGroupId = String.valueOf(Crypto.getRandomLong());
+
+        // - Create and enqueue NewsCategoryQueueable job for each category record (clone category first to avoid read only fail)
+        for (News_Category__c cat : categoriesToSync){
+            News_Category__c catClone = cat.clone(true, false, false, false);
+            System.enqueueJob(new NewsCategoryQueueable(catClone, runGroupId));
+        }
     }
 
     private static void updateSyncedCategories(List<Id> categoryIds){
