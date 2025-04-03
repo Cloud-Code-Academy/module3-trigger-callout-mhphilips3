@@ -19,7 +19,7 @@ public with sharing class NewsCategoryTriggerHandler {
                 categoryNameToIdMap.put(cat.Name, cat.Id);
             }
         }
-
+        System.debug('categoryNameToIdMap: ' + categoryNameToIdMap);
         // - Call future method for callouts
         if(!categoryNames.isEmpty()){
             syncCategoriesWithFuture(categoryNameToIdMap);
@@ -58,30 +58,35 @@ public with sharing class NewsCategoryTriggerHandler {
         
         // Create ProcessingResult instance to track state during the integration run\
         ProcessingResult result = new ProcessingResult();
-        result.messageList[0] = result.messageList[0].replace('[Async Process]', 'Future Path');
+        result.messageList.add('NewsAPI Sync Log, Future Path:');
 
         // - Make callouts to NewsAPI for each category
         System.debug('received map: ' + categoryNameToIdMap);
         Integer count = 1;
         for (String categoryName : categoryNameToIdMap.keySet()){
             result.messageList.add(count + '. Syncing \'' + categoryName + '\' category:');
+            String catId = categoryNameToIdMap.get(categoryName);
+            System.debug('catId: ' + catId);
 
             try{
                 NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, null, null);
                 
                 // If callout successful and pulls back articles, convert to Article__c records, log success message, and flag success
                 if(response !=null && !response.articles.isEmpty()){
-                    List<Article__c> articles = response.toSObjects();
+                    List<Article__c> articles = response.toSObjects(categoryNameToIdMap.get(categoryName), categoryName);
                     result.articlesToInsert.addAll(articles);
                     result.addLogSuccess('     - Retrieved ' + articles.size() + ' articles');
                     result.incrementRecordsProcessed(articles.size());
+                    System.debug('received results from test: ' + articles);
                 } else {
                     result.addLogError('     - No articles returned for category');
                     categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly
+                    System.debug('no articles returned for category');
                 }                
             } catch (Exception e) {
                 result.addLogError('     - Error during callout: ' + e.getMessage());
                 categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly
+                System.debug('Error during callout: ' + e.getMessage());
             }
 
             count++;
@@ -92,8 +97,10 @@ public with sharing class NewsCategoryTriggerHandler {
             try{
                 insert result.articlesToInsert;
                 result.addLogSuccess('     - Inserted ' + result.articlesToInsert.size() + ' total articles.');
+                System.debug ('inserted artiles');
             } catch (Exception e) {
                 result.addLogError('     - Error on article insertion: ' + e.getMessage());
+                System.debug('article insertion failed: ' + e.getMessage());
             }
         }
 
@@ -144,7 +151,8 @@ public with sharing class NewsCategoryTriggerHandler {
         for(Id categoryId : categoryIds){
             News_Category__c newCat = new News_Category__c (
                 Id = categoryId,
-                Last_Synced__c = Datetime.now()
+                Last_Synced__c = Datetime.now(),
+                Sync__c = false
             );
 
             catRecordsToUpdate.add(newCat);

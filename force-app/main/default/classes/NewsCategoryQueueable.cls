@@ -60,7 +60,8 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
             NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(category.Name, pageSize, currentPage);
             if(response != null && !response.articles.isEmpty()){
                 // Convert response to Article__c records
-                List<Article__c> articlesToInsert = response.toSObjects();
+                System.debug(category.Id);
+                List<Article__c> articlesToInsert = response.toSObjects(category.Id, category.Name);
                 result.addLogSuccess('     - Retrieved ' + articlesToInsert.size() + ' articles');
 
                 // Insert Article__c records
@@ -83,7 +84,8 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
             System.enqueueJob(new NewsCategoryQueueable(category, currentPage + 1, runGroupId, sequence + 1));
             result.addLogSuccess('     - Queued next page (' + (currentPage +1) +')');
         } else {
-            category.Last_Synced__c = System.now();
+            category.Last_Synced__c = System.now(); // Set Last Synced time
+            category.Sync__c = false; // Reset sync flag after full run
             try {
                 update category;
                 result.addLogSuccess('     - Final page processed.  Updated Last_Synced__c.');
