@@ -156,10 +156,9 @@
     <externalSharingModel>Private</externalSharingModel>
     <label>Integration Log</label>
     <nameField>
-        <displayFormat>Int Log-{0000}</displayFormat>
         <label>Integration Log Name</label>
         <trackHistory>false</trackHistory>
-        <type>AutoNumber</type>
+        <type>Text</type>
     </nameField>
     <pluralLabel>Integration Logs</pluralLabel>
     <searchLayouts></searchLayouts>

@@ -50,6 +50,7 @@ public with sharing class LogRollupService {
         }
 
         finalLog.Message__c = String.join(messageList, '\n\n');
+        finalLog.Name = 'News Sync Summary - ' + Datetime.now().format('M/d/yyy HH:mm');
         insert finalLog;
         delete logsToMerge;
     }    

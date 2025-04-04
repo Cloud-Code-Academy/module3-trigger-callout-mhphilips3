@@ -72,14 +72,14 @@ public with sharing class NewsCategoryTriggerHandler {
                 if(response !=null && !response.articles.isEmpty()){
                     List<Article__c> articles = response.toSObjects(categoryNameToIdMap.get(categoryName), categoryName);
                     result.articlesToInsert.addAll(articles);
-                    result.addLogSuccess('     - Retrieved ' + articles.size() + ' articles');
+                    result.addLogSuccess('\t- Retrieved ' + articles.size() + ' articles');
                     result.incrementRecordsProcessed(articles.size());                    
                 } else {
-                    result.addLogError('     - No articles returned for category');
+                    result.addLogError('\t- No articles returned for category');
                     categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                    
                 }                
             } catch (Exception e) {
-                result.addLogError('     - Error during callout: ' + e.getMessage());
+                result.addLogError('\t- Error during callout: ' + e.getMessage());
                 categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                
             }
 
@@ -90,14 +90,15 @@ public with sharing class NewsCategoryTriggerHandler {
         if(!result.articlesToInsert.isEmpty()){
             try{
                 insert result.articlesToInsert;
-                result.addLogSuccess('     - Inserted ' + result.articlesToInsert.size() + ' total articles.');
+                result.addLogSuccess('\t- Inserted ' + result.articlesToInsert.size() + ' total articles.');
             } catch (Exception e) {
-                result.addLogError('     - Error on article insertion: ' + e.getMessage());
+                result.addLogError('\t- Error on article insertion: ' + e.getMessage());
             }
         }
 
         // Finalize and insert log entry
         result.finalizeLogEntry();
+        result.logEntry.Name = 'News Sync - Category Insert - ' + Datetime.now().format('M/d/yyy HH:mm');
         insert result.logEntry;
 
         // - Clean up by updating categories with current date

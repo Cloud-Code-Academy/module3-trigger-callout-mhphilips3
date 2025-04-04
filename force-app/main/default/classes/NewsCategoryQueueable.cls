@@ -95,6 +95,7 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
 
         // Finalize and insert Integration Log for current queueable
         result.finalizeLogEntry();
+        result.logEntry.Name = 'TempLog - ' + category.Name + ' (Page ' + currentPage + ') - ' + runGroupId;
         insert result.logEntry;
     }
 } 
