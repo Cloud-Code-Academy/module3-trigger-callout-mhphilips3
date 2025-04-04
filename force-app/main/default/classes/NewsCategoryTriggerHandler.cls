@@ -9,9 +9,21 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param newRecords List of newly inserted News_Category__c records
      */
     public static void handleInsert(List<News_Category__c> newRecords) {
-        // TODO: Implement insert handler
+
         // - Filter categories that need to be synced
+        List<String> categoryNames = new List<String>();
+        Map<String, Id> categoryNameToIdMap = new Map<String, Id>();
+        for (News_Category__c cat : newRecords){
+            if(cat.Sync__c){
+                categoryNames.add(cat.Name);
+                categoryNameToIdMap.put(cat.Name, cat.Id);
+            }
+        }
+        
         // - Call future method for callouts
+        if(!categoryNames.isEmpty()){
+            syncCategoriesWithFuture(categoryNameToIdMap);
+        }
     }
     
     /**
@@ -21,23 +33,78 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param oldMap Map of old record states
      */
     public static void handleUpdate(List<News_Category__c> newRecords, Map<Id, News_Category__c> oldMap) {
-        // TODO: Implement update handler
+        
         // - Filter categories that need to be synced
+        List<News_Category__c> categoriesToSync = new List<News_Category__c>();
+        for(News_Category__c record : newRecords){
+            if(record.Sync__c && !oldMap.get(record.Id).Sync__c){
+                categoriesToSync.add(record);
+            }
+        }
+
         // - Call queueable method for callouts
+        if(!categoriesToSync.isEmpty()){
+            syncCategoriesWithQueueable(categoriesToSync);
+        }
     }
     
     /**
      * Future method to sync categories using the NewsAPI
      * Used for insert operations
-     * @param categoryNames List of category names to sync
+     * @param categoryNameToIdMap, a map of category names to ids
      */
     @future(callout=true)
-    public static void syncCategoriesWithFuture(List<String> categoryNames) {
-        // TODO: Implement future method
-        // - Get categories by name
+    public static void syncCategoriesWithFuture(Map<String, Id> categoryNameToIdMap) {
+        
+        // Create ProcessingResult instance to track state during the integration run\
+        ProcessingResult result = new ProcessingResult();
+        result.messageList.add('NewsAPI Sync Log, Future Path:');
+
         // - Make callouts to NewsAPI for each category
+        Integer count = 1;
+        for (String categoryName : categoryNameToIdMap.keySet()){
+            result.messageList.add(count + '. Syncing \'' + categoryName + '\' category:');
+            
+            try{
+                NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, null, null);
+                
+                // If callout successful and pulls back articles, convert to Article__c records, log success message, and flag success
+                if(response !=null && !response.articles.isEmpty()){
+                    List<Article__c> articles = response.toSObjects(categoryNameToIdMap.get(categoryName), categoryName);
+                    result.articlesToInsert.addAll(articles);
+                    result.addLogSuccess('\t- Retrieved ' + articles.size() + ' articles');
+                    result.incrementRecordsProcessed(articles.size());                    
+                } else {
+                    result.addLogError('\t- No articles returned for category');
+                    categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                    
+                }                
+            } catch (Exception e) {
+                result.addLogError('\t- Error during callout: ' + e.getMessage());
+                categoryNameToIdMap.remove(categoryName); // Remove category that did not sync properly                
+            }
+
+            count++;
+        }
+
         // - Insert retrieved articles
-        // - Update categories with last synced date
+        if(!result.articlesToInsert.isEmpty()){
+            try{
+                insert result.articlesToInsert;
+                result.addLogSuccess('\t- Inserted ' + result.articlesToInsert.size() + ' total articles.');
+            } catch (Exception e) {
+                result.addLogError('\t- Error on article insertion: ' + e.getMessage());
+            }
+        }
+
+        // Finalize and insert log entry
+        result.finalizeLogEntry();
+        result.logEntry.Name = 'News Sync - Category Insert - ' + Datetime.now().format('M/d/yyy HH:mm');
+        insert result.logEntry;
+
+        // - Clean up by updating categories with current date
+        if(!categoryNameToIdMap.isEmpty()){
+            updateSyncedCategories(categoryNameToIdMap.values());
+        }
     }
     
     /**
@@ -46,9 +113,44 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param categoriesToSync List of News_Category__c records to sync
      */
     private static void syncCategoriesWithQueueable(List<News_Category__c> categoriesToSync) {
-        // TODO: Implement queueable job enqueuing
-        // - Determine pages to sync for each category
-        // - Create and enqueue NewsCategoryQueueable job for each category
+        
+        // Generate runGroupId to relate multiple log records
+        String runGroupId = String.valueOf(Crypto.getRandomLong());
+        Integer sequence = 1;
+
+        // - Create and enqueue NewsCategoryQueueable job for each category record (clone category first to avoid read only fail)
+        for (News_Category__c cat : categoriesToSync){
+            News_Category__c catClone = cat.clone(true, false, false, false);
+            System.enqueueJob(new NewsCategoryQueueable(catClone, runGroupId, sequence));
+            sequence += cat.Pages__c != null ? Integer.valueOf(cat.Pages__c) : 1;
+        }
+
+        /**
+         * Kick off Log Consolidation Process (queueable) with the following parameters:
+         * runGroupId
+         * expectedCount = sequence -1
+         * delayMinutes = 2 
+         */
+        try{
+            System.enqueueJob(new LogRollupQueueable(runGroupId, sequence - 1, 2), 2);
+        } catch (Exception e){
+            System.debug ('error consolidating logs: ' + e.getMessage());
+        }
     }
-    
+
+    private static void updateSyncedCategories(List<Id> categoryIds){
+
+        List<News_Category__c> catRecordsToUpdate = new List<News_Category__c>();
+        for(Id categoryId : categoryIds){
+            News_Category__c newCat = new News_Category__c (
+                Id = categoryId,
+                Last_Synced__c = Datetime.now(),
+                Sync__c = false
+            );
+
+            catRecordsToUpdate.add(newCat);
+        }
+
+        update catRecordsToUpdate;
+    }    
 } 

@@ -3,11 +3,14 @@
  */
 public with sharing class NewsAPIService {
     // TODO: Define API endpoint constants
-    private static final String API_NAMED_CREDENTIAL = 'callout:NewsAPI'; //https://newsapi.org
+    private static final String API_NAMED_CREDENTIAL = 'callout:NewsAPIcred'; //https://newsapi.org
     private static final String API_ENDPOINT = '/v2/top-headlines';
     
     // TODO: Define default parameters
-    private static final Integer DEFAULT_PAGE_SIZE = 20; 
+    private static final Integer DEFAULT_PAGE_SIZE = 20;
+    private static final List<String> CATEGORIES = new List<String>{'business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology'};
+    private static final String DEFAULT_CATEGORY = 'general';
+    private static final Integer DEFAULT_PAGE = 1;
     
     /**
      * Fetches top headlines for a specified category with pagination support
@@ -19,11 +22,28 @@ public with sharing class NewsAPIService {
     public static NewsAPIResponse getTopHeadlinesByCategory(String category, Integer pageSize, Integer page) {
         // TODO: Implement method to fetch headlines by category
         // - Validate and set defaults for parameters
-        // - Build the request URL
-        // - Make the callout
-        // - Parse and return the response
+        if (string.isBlank(category) || !CATEGORIES.contains(category.toLowerCase())){
+            category = DEFAULT_CATEGORY;
+        }
+        if (pageSize == null || pageSize < 1 || pageSize > 100){
+            pageSize = DEFAULT_PAGE_SIZE;
+        }
+        if(page == null || page < 1) {
+            page = DEFAULT_PAGE;
+        }     
         
-        return null;
+        // - Build the request URL
+        String endpoint = API_NAMED_CREDENTIAL + API_ENDPOINT + '?category=' + category.toLowerCase() + '&pageSize=' + pageSize +'&page=' + page;
+        
+        // - Make the callout
+        HttpResponse response = makeCallout(endpoint);
+
+        // - Parse and return the response
+        if (response.getStatusCode() < 200 || response.getStatusCode() >= 300){
+            throw new NewsAPIException('Failed to retrieve articles. Status code: ' + response.getStatusCode());
+        } else {
+            return parseResponse(response.getBody());
+        }        
     }
     
     /**
@@ -34,10 +54,17 @@ public with sharing class NewsAPIService {
     private static HttpResponse makeCallout(String endpoint) {
         // TODO: Implement HTTP callout
         // - Create and configure HTTP request
-        // - Make the callout
-        // - Handle exceptions
+        Http http = new Http();
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(endpoint);
+        req.setMethod('GET');
         
-        return null;
+        // - Make the callout, handle exceptions
+        try {
+            return http.send(req);
+        } catch(CalloutException e){
+            throw new NewsAPIException('Callout failed: ' + e.getMessage());
+        }
     }
     
     /**
@@ -47,10 +74,12 @@ public with sharing class NewsAPIService {
      */
     private static NewsAPIResponse parseResponse(String jsonResponse) {
         // TODO: Implement JSON parsing
-        // - Deserialize JSON to NewsAPIResponse
-        // - Handle exceptions
-        
-        return null;
+        // - Deserialize JSON to NewsAPIResponse & handle exceptions
+        try{
+            return (NewsAPIResponse)JSON.deserialize(jsonResponse, NewsAPIResponse.class);
+        } catch(Exception e){
+            throw new NewsAPIException('JSON parsing failed: ' + e.getMessage());
+        }
     }
     
     /**
